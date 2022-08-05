@@ -151,6 +151,10 @@ def plot_local_dimensions(
     for time_index, time_horizon in enumerate(times):
         plt.figure(figsize=figsize)
 
+        if np.isnan(np.nanmean(local_dimension[time_index, :])):
+            plt.close()
+            continue
+
         node_size = local_dimension[time_index, :] / np.max(local_dimension[time_index, :]) * 20
 
         cmap = plt.cm.coolwarm

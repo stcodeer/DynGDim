@@ -4,7 +4,8 @@ import warnings
 
 import networkx as nx
 import numpy as np
-import scipy as sc
+from scipy.sparse.linalg import eigs, expm_multiply
+from scipy.sparse import diags
 from tqdm import tqdm
 
 PRECISION = 1e-8
@@ -30,7 +31,8 @@ class Worker:
 
 def run_all_sources(graph, times, use_spectral_gap=True, n_workers=1, disable_tqdm=False):
     """compute relative dimensions of all the nodes in a graph"""
-    sources = [get_initial_measure(graph, [node]) for node in graph]
+    total_degree = sum(graph.degree(u, weight="weight") for u in graph)
+    sources = [get_initial_measure(graph, [node], total_degree) for node in graph]
     return run_several_sources(
         graph,
         times,
@@ -45,18 +47,24 @@ def run_several_sources(
     graph, times, sources, use_spectral_gap=True, n_workers=1, disable_tqdm=False
 ):
     """relative dimensions from a list of sources"""
+    print("Construct Laplacian Begin.")
     laplacian, spectral_gap = construct_laplacian(graph, use_spectral_gap=use_spectral_gap)
+    print("Construct Laplacian Finished.")
     worker = Worker(graph, laplacian, times, spectral_gap)
+    print("Calculating relative dimensions ( Workers:", n_workers, ")")
     with multiprocessing.Pool(n_workers) as pool:
         out = np.array(
             list(
                 tqdm(
-                    pool.imap(worker, sources, chunksize=max(1, int(len(sources) / n_workers))),
+                    pool.imap(worker, sources),
                     total=len(sources),
-                    disable=disable_tqdm,
+                    disable=disable_tqdm
                 )
             )
         )
+
+
+    print("Calculating relative dimensions Done ( Workers:", n_workers, ")")
 
     relative_dimensions = out[:, 0]
     peak_times = out[:, 1]
@@ -97,7 +105,7 @@ def run_local_dimension(
     """computing the local dimensionality of each node"""
     if nodes is None:
         nodes = graph
-    sources = [get_initial_measure(graph, [node]) for node in nodes]
+    sources = [get_initial_measure(graph, [node], sum(graph.degree(u, weight="weight") for u in graph)) for node in nodes]
     return run_local_dimension_from_sources(
         graph,
         times,
@@ -139,16 +147,16 @@ def construct_laplacian(graph, laplacian_tpe="normalized", use_spectral_gap=True
     """construct the Laplacian matrix"""
     if laplacian_tpe == "normalized":
         degrees = np.array([graph.degree(i, weight="weight") for i in graph.nodes])
-        laplacian = sc.sparse.diags(1.0 / degrees).dot(nx.laplacian_matrix(graph))
-        # laplacian = nx.laplacian_matrix(graph).dot(sc.sparse.diags(1.0 / degrees))
+        laplacian = diags(1.0 / degrees).dot(nx.laplacian_matrix(graph))
+        # laplacian = nx.laplacian_matrix(graph).dot(diags(1.0 / degrees))
     else:
         raise Exception(
             "Any other laplacian type than normalized are not implemented as they will not work"
         )
 
     if use_spectral_gap:
-        spectral_gap = abs(sc.sparse.linalg.eigs(laplacian, which="SM", k=2)[0][1])
-        laplacian /= spectral_gap
+        spectral_gap = abs(eigs(laplacian, which="SM", k=2)[0][1])
+        # laplacian /= spectral_gap
     else:
         spectral_gap = 1.0
 
@@ -157,7 +165,7 @@ def construct_laplacian(graph, laplacian_tpe="normalized", use_spectral_gap=True
 
 def heat_kernel(laplacian, timestep, measure):
     """compute matrix exponential on a measure"""
-    return sc.sparse.linalg.expm_multiply(-timestep * laplacian, measure)
+    return expm_multiply(-timestep * laplacian, measure)
 
 
 def compute_node_trajectories(laplacian, initial_measure, times, disable_tqdm=False):
@@ -220,9 +228,8 @@ def extract_relative_dimensions(times, node_trajectories, initial_measure, spect
     return relative_dimensions, peak_times, peak_amplitudes, diffusion_coefficient
 
 
-def get_initial_measure(graph, nodes):
+def get_initial_measure(graph, nodes, total_degree):
     """create an measure with the correct mass from a list of nodes"""
-    total_degree = sum(graph.degree(u, weight="weight") for u in graph)
     measure = np.zeros(len(graph))
     measure[nodes] = [
         total_degree / (len(graph) * graph.degree(node, weight="weight")) / len(nodes)

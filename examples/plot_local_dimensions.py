@@ -21,7 +21,7 @@ global_dimension = compute_global_dimension(local_dimensions)
 plt.figure()
 plt.imshow(
     local_dimensions,
-    origin="auto",
+    origin="lower",
     aspect="auto",
     extent=(0, len(graph), np.log10(times[0]), np.log10(times[-1])),
 )
