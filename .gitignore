@@ -1,6 +1,8 @@
 *.DS_Store
 *.svg
 *.pkl
+# tmp
+*.pdf
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
