@@ -27,21 +27,27 @@ class dyngdim:
         self.dataset = dataset
 
 
-    def delete_zero_degree_nodes(self):
-        for i in range(self.num_nodes):
-            if self.graph.degree(i, weight = "weight") == 0:
-                self.delete_nodes.append(i)
+    # def delete_zero_degree_nodes(self):
+    #     for i in range(self.num_nodes):
+    #         if self.graph.degree(i, weight = "weight") == 0:
+    #             self.delete_nodes.append(i)
 
-        self.graph.remove_nodes_from(self.delete_nodes)
+    #     self.graph.remove_nodes_from(self.delete_nodes)
         
-        for i in reversed(self.delete_nodes):
-            del self.y_structural[i]
+    #     for i in reversed(self.delete_nodes):
+    #         del self.y_structural[i]
         
-        print("graph after deleting 0-degree nodes : ", self.graph)
+    #     print("graph after deleting 0-degree nodes : ", self.graph)
         
-        self.graph = nx.convert_node_labels_to_integers(self.graph)
+    #     self.graph = nx.convert_node_labels_to_integers(self.graph)
         
-        self.num_nodes = len(self.graph)
+    #     self.num_nodes = len(self.graph)
+    
+    
+    def add_self_loops(self):
+        for u in range(self.num_nodes):
+            self.graph.add_edge(u, u)
+            self.graph[u][u]["weight"] = 1
             
 
     def get_local_dimensions(self, n_workers):
@@ -166,7 +172,9 @@ class dyngdim:
         
         
     def graph_anomaly_detection(self, train_mask, test_mask, n_workers):
-        self.delete_zero_degree_nodes()
+        # self.delete_zero_degree_nodes()
+        
+        self.add_self_loops()
         
         self.get_local_dimensions(n_workers)
         
