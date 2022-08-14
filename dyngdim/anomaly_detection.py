@@ -9,22 +9,22 @@ from dyngdim.dyngdim import *
 
 import matplotlib.pyplot as plt
 
-import sys
-
 
 class dyngdim:
     local_dimensions = []
-    delete_nodes = []
+    # delete_nodes = []
     available_time_index = []
-    score = []
+    train_score = []
+    test_score = []
  
  
-    def __init__(self, graph, y_structural, times, dataset):
+    def __init__(self, graph, y_structural, times, dataset, is_semi_supervised):
         self.graph = graph
         self.num_nodes = len(graph)
         self.y_structural = y_structural
         self.times = times
         self.dataset = dataset
+        self.is_semi_supervised = is_semi_supervised
 
 
     # def delete_zero_degree_nodes(self):
@@ -63,7 +63,7 @@ class dyngdim:
         print("Calculation DynGDim Finished.")
 
 
-    def get_roc_auc_score(self, train_mask, test_mask):
+    def get_roc_auc_score(self, train_mask, test_mask, display=True):
 
         for time_index, time_horizon in enumerate(self.times):
             num_nan = 0
@@ -75,11 +75,46 @@ class dyngdim:
         for time_index, time_horizon in enumerate(self.times):
             y_pred = self.local_dimensions[time_index]
             y_pred = y_pred - np.nanmin(y_pred)
+            
             if np.nanmax(y_pred) < 1e-6:
                 continue
+            
             y_pred = y_pred / np.nanmax(y_pred)
-            self.score.append(roc_auc_score(self.y_structural, y_pred))
+            
+            if self.is_semi_supervised:
+                y1 = [self.y_structural[i] for i in range(self.num_nodes) if train_mask[i]]
+                y2 = [y_pred[i] for i in range(self.num_nodes) if train_mask[i]]
+                self.train_score.append(roc_auc_score(y1, y2))
+                
+                y1 = [self.y_structural[i] for i in range(self.num_nodes) if test_mask[i]]
+                y2 = [y_pred[i] for i in range(self.num_nodes) if test_mask[i]]
+                self.test_score.append(roc_auc_score(y1, y2))
+            else:
+                self.test_score.append(roc_auc_score(self.y_structural, y_pred))
+                
+            
             self.available_time_index.append(time_index)
+            
+        if display:
+            if self.is_semi_supervised:
+                print("-----------------------train_scores-----------------------")
+
+                print("roc_auc_score:", self.train_score)
+                print("roc_auc_score(argmax):", np.argmax(self.train_score))
+                print("roc_auc_score(max):", max(self.train_score))
+
+                print("-----------------------test_scores-----------------------")
+
+                print("roc_auc_score:", self.test_score)
+                print("roc_auc_score(argmax):", np.argmax(self.test_score))
+                print("roc_auc_score(max):", max(self.test_score))
+            else:
+                print("-----------------------scores-----------------------")
+
+                print("roc_auc_score:", self.test_score)
+                print("roc_auc_score(argmax):", np.argmax(self.test_score))
+                print("roc_auc_score(max):", max(self.test_score))
+                
 
 
     def plot_local_dimensions_and_outliers(self, display=False):
@@ -106,8 +141,10 @@ class dyngdim:
         plt.ylabel("Local Dimension")
 
         plt.legend(loc = "upper right")
+        
+        plt.suptitle("dataset: {dataset}", fontsize=14)
 
-        plt.savefig("figs/" + self.dataset + "_scatter.pdf")
+        plt.savefig("figs/" + self.dataset + "_local_dimensions_and_outliers.pdf")
 
         if display:
             plt.show()
@@ -115,10 +152,7 @@ class dyngdim:
         plt.close()
         
         
-    def plot_network_structure(self, nodes_bar=1000, display=False):
-        
-        if self.num_nodes >= nodes_bar:
-            sys.exit()
+    def plot_network_structure(self, display=False):
 
         plt.figure()
         
@@ -157,13 +191,16 @@ class dyngdim:
         plt.colorbar(nodes, label="Local Dimension")
 
         weights = np.array([self.graph[i][j]["weight"] for i, j in self.graph.edges])
-        nx.draw_networkx_edges(self.graph, pos=pos, alpha=0.5, width=weights / np.max(weights))
+        
+        nx.draw_networkx_edges(self.graph, pos=pos, alpha=0.5, width = weights / np.max(weights))
+
+        plt.suptitle("dataset: {dataset}", fontsize=14)
 
         plt.suptitle("Time Horizon {:.2e}".format(time_horizon), fontsize=14)
 
         plt.legend(loc = "upper right")
 
-        plt.savefig("figs/" + self.dataset + "_network.pdf")
+        plt.savefig("figs/" + self.dataset + "_network_structure.pdf")
 
         if display:
             plt.show()
@@ -171,7 +208,38 @@ class dyngdim:
         plt.close()
         
         
-    def graph_anomaly_detection(self, train_mask, test_mask, n_workers):
+    def plot_roc_auc_score(self, display=False):
+        num_scales = len(self.available_time_index)
+        available_time_horizon = self.times[self.available_time_index]
+        
+        
+        fig, axes = plt.subplots(1, 1, figsize=(8, 4))
+        if self.is_semi_supervised:
+            axes.plot(available_time_horizon, self.train_score, label="Train Mask", linestyle='-', color='black', marker='.', linewidth=1.5)
+            axes.plot(available_time_horizon, self.test_score, label="Test Mask", linestyle='-', color='red', marker='.', linewidth=1.5)
+            plt.legend(loc = "upper right")
+        else:
+            axes.plot(available_time_horizon, self.test_score, linestyle='-', color='red', marker='.', linewidth=1.5)
+        
+        axes.set_yticks([0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
+        axes.set_xticks([2, 4, 6, 8, 10])
+        
+        axes.grid(which='minor', c='lightgrey')
+        
+        axes.set_ylabel("ROC AUC Score")
+        axes.set_xlabel("Time Horizon")
+        
+        plt.suptitle("dataset: {}".format(self.dataset), fontsize=14)
+        
+        plt.savefig("figs/" + self.dataset + "_roc_auc_score.pdf")
+        
+        if display:
+            plt.show()
+        
+        plt.close()
+        
+        
+    def graph_anomaly_detection(self, train_mask, test_mask, n_workers=1, display=True):
         # self.delete_zero_degree_nodes()
         
         self.add_self_loops()
