@@ -253,6 +253,50 @@ class dyngdim:
         self.get_local_dimensions(n_workers)
         
         self.get_roc_auc_score(train_mask, test_mask)
+        
+        
+    def graph_anomaly_detection_centrality(self, display=True):
+        self.test_score.clear()
+        
+        def get_array_from_centrality(centrality):
+            return np.array([centrality[i] for i in range(self.num_nodes)])
+        
+        # Degree Centrality
+        deg_cen = get_array_from_centrality(nx.degree_centrality(self.graph))
+        print("Calculating Degree Centrality Finished.")
+
+        # Closeness Centrality
+        clo_cen = get_array_from_centrality(nx.closeness_centrality(self.graph))
+        print("Calculating Closeness Centrality Finished.")
+
+        # Eigenvector Centrality
+        eig_cen = get_array_from_centrality(nx.eigenvector_centrality_numpy(self.graph))
+        print("Calculating Eigenvector Centrality Finished.")
+
+        # Katz Centrality
+        kat_cen = get_array_from_centrality(nx.katz_centrality_numpy(self.graph))
+        print("Calculating Katz Centrality Finished.")
+
+        # Pagerank
+        pagerank = get_array_from_centrality(nx.pagerank_numpy(self.graph))
+        print("Calculating Pagerank Finished.")
+
+        centrality = np.array([deg_cen, clo_cen, eig_cen, kat_cen, pagerank])
+
+        for time_index, time_horizon in enumerate(centrality):
+            y_pred = centrality[time_index]
+            y_pred = y_pred - np.nanmin(y_pred)
+            if np.nanmax(y_pred) < 1e-6:
+                continue
+            y_pred = y_pred / np.nanmax(y_pred)
+            self.test_score.append(roc_auc_score(self.y_structural, y_pred))
+            
+        if display:
+            print("-----------------------scores-----------------------")
+
+            print("roc_auc_score:", self.test_score)
+            print("roc_auc_score(argmax):", np.argmax(self.test_score))
+            print("roc_auc_score(max):", max(self.test_score))
             
             
     def graph_anomaly_detection_pygod(self, data, pygod_builtin_model, display=True):

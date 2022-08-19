@@ -53,6 +53,8 @@ graph.graph_anomaly_detection_dyngdim(train_mask, test_mask, n_workers)
 
 graph.plot_roc_auc_score(display=True)
 
+graph.graph_anomaly_detection_centrality()
+
 graph.graph_anomaly_detection_pygod(data, GAAN)
 
 # graph.plot_local_dimensions_and_outliers(display=True)
