@@ -1,4 +1,5 @@
 import networkx as nx
+import dgl
 
 def build_networkx_from_torch_geometric(data):
     graph = nx.Graph()
@@ -33,3 +34,6 @@ def build_networkx_from_torch_geometric(data):
     print("Build Network Finished.")
     
     return graph
+
+def build_networkx_from_dgl(data):
+    return dgl.to_networkx(data)

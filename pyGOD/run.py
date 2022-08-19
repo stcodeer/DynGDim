@@ -7,7 +7,7 @@ from dyngdim.build_graph import *
 from pygod.utils import load_data
 
 
-times = np.logspace(0, 1.0, 50)
+times = np.logspace(0, 1.0, 2)
 
 n_workers = 5
 
@@ -16,7 +16,7 @@ n_workers = 5
 
 datasets = ['weibo', 'reddit', 'inj_cora', 'inj_amazon', 'inj_flickr', 'gen_time', 'gen_100', 'gen_500', 'gen_1000', 'gen_5000', 'gen_10000']
 
-dataset = "gen_5000"
+dataset = "inj_cora"
 
 data = load_data(dataset)
 print(type(data))
@@ -49,9 +49,11 @@ else:
     train_mask = []
     test_mask = []
 
-graph.graph_anomaly_detection(train_mask, test_mask, n_workers)
+graph.graph_anomaly_detection_dyngdim(train_mask, test_mask, n_workers)
 
 graph.plot_roc_auc_score(display=True)
+
+graph.graph_anomaly_detection_pygod(data, GAAN)
 
 # graph.plot_local_dimensions_and_outliers(display=True)
 

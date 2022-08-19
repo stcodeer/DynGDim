@@ -1,4 +1,3 @@
-from zoneinfo import available_timezones
 import numpy as np
 
 import networkx as nx
@@ -7,7 +6,12 @@ from sklearn.metrics import roc_auc_score
 
 from dyngdim.dyngdim import *
 
+from pygod.metrics import eval_roc_auc
+from pygod.models import *
+
 import matplotlib.pyplot as plt
+
+import time
 
 
 class dyngdim:
@@ -64,6 +68,8 @@ class dyngdim:
 
 
     def get_roc_auc_score(self, train_mask, test_mask, display=True):
+        self.train_score.clear()
+        self.test_score.clear()
 
         for time_index, time_horizon in enumerate(self.times):
             num_nan = 0
@@ -239,7 +245,7 @@ class dyngdim:
         plt.close()
         
         
-    def graph_anomaly_detection(self, train_mask, test_mask, n_workers=1, display=True):
+    def graph_anomaly_detection_dyngdim(self, train_mask, test_mask, n_workers=1, display=True):
         # self.delete_zero_degree_nodes()
         
         self.add_self_loops()
@@ -247,3 +253,27 @@ class dyngdim:
         self.get_local_dimensions(n_workers)
         
         self.get_roc_auc_score(train_mask, test_mask)
+            
+            
+    def graph_anomaly_detection_pygod(self, data, pygod_builtin_model, display=True):
+        self.test_score.clear()
+        
+        before_time = time.time()
+
+        model = pygod_builtin_model()  # hyperparameters can be set here
+        model.fit(data)  # data is a Pytorch Geometric data object
+
+        outlier_scores = model.decision_function(data)
+
+        auc_score = eval_roc_auc(self.y_structural, outlier_scores)
+        
+        self.test_score.append(auc_score)
+
+        after_time = time.time()
+
+        print(auc_score)
+
+        print("before time: ", before_time)
+        print("after time: ", after_time)
+        print("total time cost: ", after_time - before_time)
+            
