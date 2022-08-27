@@ -52,7 +52,7 @@ def run_several_sources(
 ):
     """relative dimensions from a list of sources"""
     print("Construct Laplacian Begin.")
-    laplacian, spectral_gap = construct_laplacian(graph, use_spectral_gap=use_spectral_gap)
+    laplacian, spectral_gap = construct_laplacian(graph, use_spectral_gap=use_spectral_gap, directed=directed)
     print("Construct Laplacian Finished.")
     worker = Worker(graph, laplacian, times, spectral_gap)
     print("Calculating relative dimensions ( Workers:", n_workers, ")")
@@ -170,7 +170,6 @@ def construct_laplacian(graph, laplacian_tpe="normalized", use_spectral_gap=True
 
     return laplacian, spectral_gap
 
-
 def heat_kernel(laplacian, timestep, measure):
     """compute matrix exponential on a measure"""
     # return expm(-timestep * laplacian).dot(measure)
@@ -201,11 +200,11 @@ def extract_relative_dimensions(times, node_trajectories, initial_measure, spect
     peak_amplitudes = np.max(node_trajectories, axis=0)
     peak_pos = np.argmax(node_trajectories, axis=0)
     missed_peaks = np.where(peak_pos[initial_measure == 0] == 0)[0]
-    if len(missed_peaks) > 0:
-        warnings.warn(
-            """Please reduce the minimum time because some peaks are not detected
-                      We will consider them as unreachable."""
-        )
+    # if len(missed_peaks) > 0:
+    #     warnings.warn(
+    #         """Please reduce the minimum time because some peaks are not detected
+    #                   We will consider them as unreachable."""
+    #     )
 
     peak_times = times[peak_pos]
 

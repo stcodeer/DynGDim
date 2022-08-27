@@ -7,7 +7,7 @@ from dyngdim.build_graph import *
 from pygod.utils import load_data
 
 
-times = np.logspace(0, 1.0, 2)
+times = np.logspace(0, 1.0, 20)
 
 n_workers = 5
 
@@ -21,15 +21,18 @@ dataset = "inj_cora"
 data = load_data(dataset)
 print(type(data))
 print(data)
+# print(data.is_directed())
 
 print("Load Dataset Finished.")
 
-is_semi_supervised = hasattr(data, "train_mask")
+is_semi_supervised = False
 
-if is_semi_supervised:
-    print("train_mask: ", sum(data.train_mask))
-    print("val_mask: ", sum(data.val_mask))
-    print("test_mask: ", sum(data.test_mask))
+# is_semi_supervised = hasattr(data, "train_mask")
+
+# if is_semi_supervised:
+#     print("train_mask: ", sum(data.train_mask))
+#     print("val_mask: ", sum(data.val_mask))
+#     print("test_mask: ", sum(data.test_mask))
 
 y_structural = []
 
@@ -38,9 +41,9 @@ if dataset == "weibo" or dataset == "reddit":
 else:
     y_structural = (data.y >> 1 & 1).int().tolist()
 
-networkx = build_networkx_from_torch_geometric(data)
+graph_networkx = build_networkx_from_torch_geometric(data)
 
-graph = dyngdim(networkx, [y_structural[i] for i in range(len(networkx))], times, dataset, is_semi_supervised)
+graph = dyngdim(graph_networkx, y_structural, times, dataset, is_semi_supervised)
 
 if is_semi_supervised:
     train_mask = [data.train_mask[i] for i in range(graph.num_nodes)]
@@ -51,11 +54,11 @@ else:
 
 graph.graph_anomaly_detection_dyngdim(train_mask, test_mask, n_workers)
 
-graph.plot_roc_auc_score(display=True)
+# graph.plot_roc_auc_score(display=True)
 
 graph.graph_anomaly_detection_centrality()
 
-graph.graph_anomaly_detection_pygod(data, GAAN)
+graph.graph_anomaly_detection_pygod(data)
 
 # graph.plot_local_dimensions_and_outliers(display=True)
 

@@ -13,22 +13,23 @@ import matplotlib.pyplot as plt
 
 import time
 
+import torch
+
 
 class dyngdim:
-    local_dimensions = []
-    # delete_nodes = []
-    available_time_index = []
-    train_score = []
-    test_score = []
  
  
-    def __init__(self, graph, y_structural, times, dataset, is_semi_supervised):
+    def __init__(self, graph, y_structural, times, dataset, is_semi_supervised=False):
         self.graph = graph
         self.num_nodes = len(graph)
         self.y_structural = y_structural
         self.times = times
         self.dataset = dataset
         self.is_semi_supervised = is_semi_supervised
+        self.local_dimensions = []
+        # delete_nodes = []
+        self.train_score = []
+        self.test_score = []
 
 
     # def delete_zero_degree_nodes(self):
@@ -54,9 +55,11 @@ class dyngdim:
             self.graph[u][u]["weight"] = 1
             
 
-    def get_local_dimensions(self, n_workers):
-        relative_dimensions, peak_times = run_all_sources(self.graph, self.times, n_workers=n_workers)
-
+    def get_local_dimensions(self, n_workers, directed=False):
+        relative_dimensions, peak_times = run_all_sources(self.graph, self.times, n_workers=n_workers, directed=directed)
+        
+        self.local_dimensions = []
+        
         for time_horizon in self.times:
             relative_dimensions_reduced = relative_dimensions.copy()
             relative_dimensions_reduced[peak_times > time_horizon] = np.nan
@@ -67,10 +70,10 @@ class dyngdim:
         print("Calculation DynGDim Finished.")
 
 
-    def get_roc_auc_score(self, train_mask, test_mask, display=True):
+    def get_roc_auc_score(self, train_mask=[], test_mask=[], display=True):
         self.train_score.clear()
         self.test_score.clear()
-
+        
         for time_index, time_horizon in enumerate(self.times):
             num_nan = 0
             for index, local_dimension in enumerate(self.local_dimensions[time_index]):
@@ -80,12 +83,6 @@ class dyngdim:
         
         for time_index, time_horizon in enumerate(self.times):
             y_pred = self.local_dimensions[time_index]
-            y_pred = y_pred - np.nanmin(y_pred)
-            
-            if np.nanmax(y_pred) < 1e-6:
-                continue
-            
-            y_pred = y_pred / np.nanmax(y_pred)
             
             if self.is_semi_supervised:
                 y1 = [self.y_structural[i] for i in range(self.num_nodes) if train_mask[i]]
@@ -97,29 +94,35 @@ class dyngdim:
                 self.test_score.append(roc_auc_score(y1, y2))
             else:
                 self.test_score.append(roc_auc_score(self.y_structural, y_pred))
-                
-            
-            self.available_time_index.append(time_index)
             
         if display:
+            print("-----------------------DynGDim-----------------------")
             if self.is_semi_supervised:
                 print("-----------------------train_scores-----------------------")
 
                 print("roc_auc_score:", self.train_score)
                 print("roc_auc_score(argmax):", np.argmax(self.train_score))
                 print("roc_auc_score(max):", max(self.train_score))
+                print("roc_auc_score(argmin):", np.argmin(self.train_score))
+                print("roc_auc_score(min):", min(self.train_score))
 
                 print("-----------------------test_scores-----------------------")
 
                 print("roc_auc_score:", self.test_score)
                 print("roc_auc_score(argmax):", np.argmax(self.test_score))
                 print("roc_auc_score(max):", max(self.test_score))
+                print("roc_auc_score(argmin):", np.argmin(self.test_score))
+                print("roc_auc_score(min):", min(self.test_score))
             else:
                 print("-----------------------scores-----------------------")
 
                 print("roc_auc_score:", self.test_score)
                 print("roc_auc_score(argmax):", np.argmax(self.test_score))
                 print("roc_auc_score(max):", max(self.test_score))
+                print("roc_auc_score(argmin):", np.argmin(self.test_score))
+                print("roc_auc_score(min):", min(self.test_score))
+                
+            print("----------------------------------------------------")
                 
 
 
@@ -159,10 +162,9 @@ class dyngdim:
         
         
     def plot_network_structure(self, display=False):
-
         plt.figure()
         
-        time_index = self.available_time_index[0]
+        time_index = len(self.times) // 2
         time_horizon = self.times[time_index]
 
         vmin = np.nanmin(self.local_dimensions)
@@ -215,17 +217,13 @@ class dyngdim:
         
         
     def plot_roc_auc_score(self, display=False):
-        num_scales = len(self.available_time_index)
-        available_time_horizon = self.times[self.available_time_index]
-        
-        
         fig, axes = plt.subplots(1, 1, figsize=(8, 4))
         if self.is_semi_supervised:
-            axes.plot(available_time_horizon, self.train_score, label="Train Mask", linestyle='-', color='black', marker='.', linewidth=1.5)
-            axes.plot(available_time_horizon, self.test_score, label="Test Mask", linestyle='-', color='red', marker='.', linewidth=1.5)
+            axes.plot(self.times, self.train_score, label="Train Mask", linestyle='-', color='black', marker='.', linewidth=1.5)
+            axes.plot(self.times, self.test_score, label="Test Mask", linestyle='-', color='red', marker='.', linewidth=1.5)
             plt.legend(loc = "upper right")
         else:
-            axes.plot(available_time_horizon, self.test_score, linestyle='-', color='red', marker='.', linewidth=1.5)
+            axes.plot(self.times, self.test_score, linestyle='-', color='red', marker='.', linewidth=1.5)
         
         axes.set_yticks([0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
         axes.set_xticks([2, 4, 6, 8, 10])
@@ -245,14 +243,14 @@ class dyngdim:
         plt.close()
         
         
-    def graph_anomaly_detection_dyngdim(self, train_mask, test_mask, n_workers=1, display=True):
+    def graph_anomaly_detection_dyngdim(self, train_mask=[], test_mask=[], n_workers=1, directed=False, display=True):
         # self.delete_zero_degree_nodes()
         
         self.add_self_loops()
         
-        self.get_local_dimensions(n_workers)
+        self.get_local_dimensions(n_workers, directed)
         
-        self.get_roc_auc_score(train_mask, test_mask)
+        self.get_roc_auc_score(train_mask, test_mask, display)
         
         
     def graph_anomaly_detection_centrality(self, display=True):
@@ -285,39 +283,57 @@ class dyngdim:
 
         for time_index, time_horizon in enumerate(centrality):
             y_pred = centrality[time_index]
-            y_pred = y_pred - np.nanmin(y_pred)
-            if np.nanmax(y_pred) < 1e-6:
-                continue
-            y_pred = y_pred / np.nanmax(y_pred)
             self.test_score.append(roc_auc_score(self.y_structural, y_pred))
             
         if display:
+            print("-----------------------Centrality-----------------------")
             print("-----------------------scores-----------------------")
 
             print("roc_auc_score:", self.test_score)
             print("roc_auc_score(argmax):", np.argmax(self.test_score))
             print("roc_auc_score(max):", max(self.test_score))
+            print("roc_auc_score(argmin):", np.argmin(self.test_score))
+            print("roc_auc_score(min):", min(self.test_score))
+            
+            print("----------------------------------------------------")
             
             
-    def graph_anomaly_detection_pygod(self, data, pygod_builtin_model, display=True):
+    def graph_anomaly_detection_pygod(self, data, display=True):
         self.test_score.clear()
         
-        before_time = time.time()
+        self.local_dimensions = []
 
-        model = pygod_builtin_model()  # hyperparameters can be set here
-        model.fit(data)  # data is a Pytorch Geometric data object
-
-        outlier_scores = model.decision_function(data)
-
-        auc_score = eval_roc_auc(self.y_structural, outlier_scores)
+        models = [MLPAE, SCAN, Radar, ANOMALOUS, GCNAE, DOMINANT, DONE, AdONE, AnomalyDAE, GAAN, CONAD]
         
-        self.test_score.append(auc_score)
+        num_nodes = data.y.shape[0]
+        num_train_nodes =  num_nodes // 2
+        num_test_nodes = num_nodes - num_train_nodes
+        
+        data.train_mask = torch.tensor([1] * num_train_nodes + [0] * num_test_nodes)
+        data.test_mask = torch.tensor([0] * num_train_nodes + [1] * num_test_nodes)
+        
+        for model_name in models:
+            model = model_name()  # hyperparameters can be set here
+            
+            model.fit(data)  # data is a Pytorch Geometric data object
 
-        after_time = time.time()
+            outlier_scores = model.decision_function(data)
+            
+            self.local_dimensions.append(outlier_scores)
 
-        print(auc_score)
+            auc_score = eval_roc_auc(self.y_structural, outlier_scores)
+            
+            self.test_score.append(auc_score)
+            
+        if display:
+            print("-----------------------PyGOD-----------------------")
+            print("-----------------------scores-----------------------")
 
-        print("before time: ", before_time)
-        print("after time: ", after_time)
-        print("total time cost: ", after_time - before_time)
+            print("roc_auc_score:", self.test_score)
+            print("roc_auc_score(argmax):", np.argmax(self.test_score))
+            print("roc_auc_score(max):", max(self.test_score))
+            print("roc_auc_score(argmin):", np.argmin(self.test_score))
+            print("roc_auc_score(min):", min(self.test_score))
+            
+            print("----------------------------------------------------")
             
