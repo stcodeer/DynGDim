@@ -216,7 +216,27 @@ class dyngdim:
         plt.close()
         
         
-    def plot_roc_auc_score(self, display=False):
+    def plot_roc_auc_score(self, y_preds, y_structural, name, display=True):
+        self.test_score.clear()
+        
+        for time_index, time_horizon in enumerate(y_preds):
+            y_pred = y_preds[time_index]
+            self.test_score.append(roc_auc_score(y_structural, y_pred))
+        
+        if display:
+            print("-----------------------" + name + "-----------------------")
+            print("-----------------------scores-----------------------")
+
+            print("roc_auc_score:", self.test_score)
+            print("roc_auc_score(argmax):", np.argmax(self.test_score))
+            print("roc_auc_score(max):", max(self.test_score))
+            print("roc_auc_score(argmin):", np.argmin(self.test_score))
+            print("roc_auc_score(min):", min(self.test_score))
+            
+            print("----------------------------------------------------")
+        
+        
+    def plot_roc_auc_score_times(self, display=False):
         fig, axes = plt.subplots(1, 1, figsize=(8, 4))
         if self.is_semi_supervised:
             axes.plot(self.times, self.train_score, label="Train Mask", linestyle='-', color='black', marker='.', linewidth=1.5)
@@ -254,7 +274,7 @@ class dyngdim:
         
         
     def graph_anomaly_detection_centrality(self, display=True):
-        self.test_score.clear()
+        self.local_dimensions = []
         
         def get_array_from_centrality(centrality):
             return np.array([centrality[i] for i in range(self.num_nodes)])
@@ -263,7 +283,7 @@ class dyngdim:
         deg_cen = get_array_from_centrality(nx.degree_centrality(self.graph))
         print("Calculating Degree Centrality Finished.")
 
-        # Closeness Centrality
+        # Closeness Centrality (low speed)
         clo_cen = get_array_from_centrality(nx.closeness_centrality(self.graph))
         print("Calculating Closeness Centrality Finished.")
 
@@ -275,32 +295,18 @@ class dyngdim:
         kat_cen = get_array_from_centrality(nx.katz_centrality_numpy(self.graph))
         print("Calculating Katz Centrality Finished.")
 
-        # Pagerank
+        # Pagerank (low speed)
         pagerank = get_array_from_centrality(nx.pagerank_numpy(self.graph))
         print("Calculating Pagerank Finished.")
 
         centrality = np.array([deg_cen, clo_cen, eig_cen, kat_cen, pagerank])
+        
+        self.local_dimensions = centrality
 
-        for time_index, time_horizon in enumerate(centrality):
-            y_pred = centrality[time_index]
-            self.test_score.append(roc_auc_score(self.y_structural, y_pred))
-            
-        if display:
-            print("-----------------------Centrality-----------------------")
-            print("-----------------------scores-----------------------")
-
-            print("roc_auc_score:", self.test_score)
-            print("roc_auc_score(argmax):", np.argmax(self.test_score))
-            print("roc_auc_score(max):", max(self.test_score))
-            print("roc_auc_score(argmin):", np.argmin(self.test_score))
-            print("roc_auc_score(min):", min(self.test_score))
-            
-            print("----------------------------------------------------")
+        self.plot_roc_auc_score(centrality, self.y_structural, "Centrality", display)
             
             
     def graph_anomaly_detection_pygod(self, data, display=True):
-        self.test_score.clear()
-        
         self.local_dimensions = []
 
         models = [MLPAE, SCAN, Radar, ANOMALOUS, GCNAE, DOMINANT, DONE, AdONE, AnomalyDAE, GAAN, CONAD]
@@ -313,6 +319,9 @@ class dyngdim:
         data.test_mask = torch.tensor([0] * num_train_nodes + [1] * num_test_nodes)
         
         for model_name in models:
+            
+            print("running " + model_name.__name__ + "method")
+            
             model = model_name()  # hyperparameters can be set here
             
             model.fit(data)  # data is a Pytorch Geometric data object
@@ -320,20 +329,6 @@ class dyngdim:
             outlier_scores = model.decision_function(data)
             
             self.local_dimensions.append(outlier_scores)
-
-            auc_score = eval_roc_auc(self.y_structural, outlier_scores)
-            
-            self.test_score.append(auc_score)
-            
-        if display:
-            print("-----------------------PyGOD-----------------------")
-            print("-----------------------scores-----------------------")
-
-            print("roc_auc_score:", self.test_score)
-            print("roc_auc_score(argmax):", np.argmax(self.test_score))
-            print("roc_auc_score(max):", max(self.test_score))
-            print("roc_auc_score(argmin):", np.argmin(self.test_score))
-            print("roc_auc_score(min):", min(self.test_score))
-            
-            print("----------------------------------------------------")
+        
+        self.plot_roc_auc_score(self.local_dimensions, self.y_structural, "PyGOD", display)
             

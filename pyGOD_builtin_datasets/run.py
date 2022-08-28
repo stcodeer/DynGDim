@@ -16,12 +16,11 @@ n_workers = 5
 
 datasets = ['weibo', 'reddit', 'inj_cora', 'inj_amazon', 'inj_flickr', 'gen_time', 'gen_100', 'gen_500', 'gen_1000', 'gen_5000', 'gen_10000']
 
-dataset = "inj_cora"
+dataset = "gen_100"
 
-data = load_data(dataset)
-print(type(data))
-print(data)
-# print(data.is_directed())
+graph_pyg = load_data(dataset)
+print(graph_pyg)
+# print(graph_pyg.is_directed())
 
 print("Load Dataset Finished.")
 
@@ -37,28 +36,28 @@ is_semi_supervised = False
 y_structural = []
 
 if dataset == "weibo" or dataset == "reddit":
-    y_structural = data.y.int().tolist()
+    y_structural = graph_pyg.y.int().tolist()
 else:
-    y_structural = (data.y >> 1 & 1).int().tolist()
+    y_structural = (graph_pyg.y >> 1 & 1).int().tolist()
 
-graph_networkx = build_networkx_from_torch_geometric(data)
+graph_networkx = build_networkx_from_torch_geometric(graph_pyg)
 
 graph = dyngdim(graph_networkx, y_structural, times, dataset, is_semi_supervised)
 
 if is_semi_supervised:
-    train_mask = [data.train_mask[i] for i in range(graph.num_nodes)]
-    test_mask = data.test_mask
+    train_mask = [graph_pyg.train_mask[i] for i in range(graph.num_nodes)]
+    test_mask = graph_pyg.test_mask
 else:
     train_mask = []
     test_mask = []
 
 graph.graph_anomaly_detection_dyngdim(train_mask, test_mask, n_workers)
 
-# graph.plot_roc_auc_score(display=True)
+graph.plot_roc_auc_score_times(display=True)
 
 graph.graph_anomaly_detection_centrality()
 
-graph.graph_anomaly_detection_pygod(data)
+graph.graph_anomaly_detection_pygod(graph_pyg)
 
 # graph.plot_local_dimensions_and_outliers(display=True)
 
