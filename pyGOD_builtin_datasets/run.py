@@ -1,22 +1,24 @@
+
+from pygod.utils import load_data
+import torch
+
 import numpy as np
 
 from dyngdim.anomaly_detection import *
 
 from dyngdim.build_graph import *
 
-from pygod.utils import load_data
-
 
 times = np.logspace(0, 1.0, 20)
 
-n_workers = 5
+n_workers = 1
 
 
 # datasets from https://github.com/pygod-team/data
 
 datasets = ['weibo', 'reddit', 'inj_cora', 'inj_amazon', 'inj_flickr', 'gen_time', 'gen_100', 'gen_500', 'gen_1000', 'gen_5000', 'gen_10000']
 
-dataset = "gen_100"
+dataset = "reddit"
 
 graph_pyg = load_data(dataset)
 print(graph_pyg)

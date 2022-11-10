@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 
 import networkx as nx
@@ -306,10 +307,14 @@ class dyngdim:
         self.plot_roc_auc_score(centrality, self.y_structural, "Centrality", display)
             
             
-    def graph_anomaly_detection_pygod(self, data, display=True):
+    def graph_anomaly_detection_pygod(self, data, self_loop=True, delete_feature=False, delete_graph=False, display=True):
         self.local_dimensions = []
 
+        # unsupervised models (low speed)
         models = [MLPAE, SCAN, Radar, ANOMALOUS, GCNAE, DOMINANT, DONE, AdONE, AnomalyDAE, GAAN, CONAD]
+        
+        # unsupervised models
+        # models = [MLPAE, Radar, ANOMALOUS]
         
         num_nodes = data.y.shape[0]
         num_train_nodes =  num_nodes // 2
@@ -318,9 +323,22 @@ class dyngdim:
         data.train_mask = torch.tensor([1] * num_train_nodes + [0] * num_test_nodes)
         data.test_mask = torch.tensor([0] * num_train_nodes + [1] * num_test_nodes)
         
+        if self_loop:
+            x = data.edge_index[0].tolist() + [i for i in range(num_nodes)]
+            y = data.edge_index[1].tolist() + [i for i in range(num_nodes)]
+            data.edge_index = torch.tensor([x, y])
+            
+        # deleting all features
+        if delete_feature:
+            data.x = data.x.zero_()
+
+        # deleting graph structure
+        if delete_graph:
+            data.edge_index = torch.tensor([[i for i in range(num_nodes)], [i for i in range(num_nodes)]])
+
         for model_name in models:
             
-            print("running " + model_name.__name__ + "method")
+            print("running " + model_name.__name__ + " model.")
             
             model = model_name()  # hyperparameters can be set here
             
@@ -328,6 +346,10 @@ class dyngdim:
 
             outlier_scores = model.decision_function(data)
             
+            # for i in range(len(outlier_scores)):
+            #     if np.isnan(outlier_scores[i]):
+            #         outlier_scores[i] = 0
+                    
             self.local_dimensions.append(outlier_scores)
         
         self.plot_roc_auc_score(self.local_dimensions, self.y_structural, "PyGOD", display)

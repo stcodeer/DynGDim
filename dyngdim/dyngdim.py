@@ -1,4 +1,5 @@
 """main functions"""
+import torch
 import multiprocessing
 import warnings
 
@@ -170,9 +171,20 @@ def construct_laplacian(graph, laplacian_tpe="normalized", use_spectral_gap=True
 
     return laplacian, spectral_gap
 
+import os
+
 def heat_kernel(laplacian, timestep, measure):
     """compute matrix exponential on a measure"""
     # return expm(-timestep * laplacian).dot(measure)
+    np.set_printoptions(threshold=np.inf)
+    fp=open('/home/tongsu/DynGDim/pyGOD_builtin_datasets/data','a+')
+    print(laplacian.data, file=fp)
+    print(laplacian.indices, file=fp)
+    print(laplacian.indptr, file=fp)
+    # print(laplacian.toarray(), file=fp)
+    while(1):
+        timestep *= 0.1
+        print("ok")
     return expm_multiply(-timestep * laplacian, measure)
 
 

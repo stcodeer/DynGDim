@@ -9,14 +9,14 @@ from pygod.utils import load_data
 
 times = np.logspace(0, 1.0, 20)
 
-n_workers = 5
+n_workers = 10
 
 
 # datasets from https://github.com/pygod-team/data
 
 datasets = ['weibo', 'reddit', 'inj_cora', 'inj_amazon', 'inj_flickr', 'gen_time', 'gen_100', 'gen_500', 'gen_1000', 'gen_5000', 'gen_10000']
 
-dataset = "inj_cora"
+dataset = "weibo"
 
 graph_pyg = load_data(dataset)
 print(graph_pyg)
@@ -29,6 +29,10 @@ num_nodes = len(graph_pyg.y)
 graph_pygs = graph_partitioning_torch_geometric(graph_pyg, num_nodes // 1000)
 
 print(graph_pygs)
+
+num_total_edges = sum([graph_pyg_part.edge_index.shape[1] for graph_pyg_part in graph_pygs])
+
+print("edges: " + str(graph_pyg.edge_index.shape[1]) + "  -->  " + str(num_total_edges))
 
 y_structural = []
 y_dyngdim = [[] for i in range(len(times))]
@@ -61,10 +65,6 @@ for graph_pyg_part in graph_pygs:
     
     for i in range(len(y_pygod)):
         y_pygod[i] += graph.local_dimensions[i].tolist()
-
-    # graph.plot_local_dimensions_and_outliers(display=True)
-
-    # graph.plot_network_structure(display=True)
 
 print("combaring all anomaly scores")
 

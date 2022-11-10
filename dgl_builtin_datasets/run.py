@@ -33,16 +33,16 @@ print(graph_pyg)
 
 graph_networkx = build_networkx_from_torch_geometric(graph_pyg)
 
+print("111")
+
 graph = dyngdim(graph_networkx, graph_pyg.y, times, dataset)
 
-# graph.graph_anomaly_detection_dyngdim(n_workers=n_workers)
+# graph = dyngdim(y_structural=graph_pyg.y)
+
+graph.graph_anomaly_detection_dyngdim(n_workers=n_workers)
 
 # graph.graph_anomaly_detection_centrality()
 
 graph.graph_anomaly_detection_pygod(graph_pyg)
-
-# graph.plot_local_dimensions_and_outliers(display=True)
-
-# graph.plot_network_structure(display=True)
 
     
